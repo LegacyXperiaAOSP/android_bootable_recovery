@@ -68,6 +68,7 @@ LOCAL_STATIC_LIBRARIES := \
     libmtdutils \
     libmincrypt \
     libminadbd \
+    libbusybox \
     libfusesideload \
     libminui \
     libpng \
@@ -89,7 +90,35 @@ else
   LOCAL_STATIC_LIBRARIES += $(TARGET_RECOVERY_UI_LIB)
 endif
 
+# Busybox linkage is a non-fatal error
+LOCAL_LDFLAGS += -Wl,--no-fatal-warnings
+
+# Symlinks
+RECOVERY_LINKS := busybox reboot setup_adbd
+RECOVERY_SYMLINKS := $(addprefix $(TARGET_RECOVERY_ROOT_OUT)/sbin/,$(RECOVERY_LINKS))
+
+BUSYBOX_LINKS := $(shell cat external/busybox/busybox-minimal.links)
+exclude := tune2fs mke2fs
+RECOVERY_BUSYBOX_SYMLINKS := $(addprefix $(TARGET_RECOVERY_ROOT_OUT)/sbin/,$(filter-out $(exclude),$(notdir $(BUSYBOX_LINKS))))
+
+LOCAL_ADDITIONAL_DEPENDENCIES += $(RECOVERY_SYMLINKS) $(RECOVERY_BUSYBOX_SYMLINKS)
+
 include $(BUILD_EXECUTABLE)
+
+$(RECOVERY_SYMLINKS): RECOVERY_BINARY := $(LOCAL_MODULE)
+$(RECOVERY_SYMLINKS):
+	@echo "Symlink: $@ -> $(RECOVERY_BINARY)"
+	@mkdir -p $(dir $@)
+	@rm -rf $@
+	$(hide) ln -sf $(RECOVERY_BINARY) $@
+
+# Now let's do recovery symlinks
+$(RECOVERY_BUSYBOX_SYMLINKS): BUSYBOX_BINARY := busybox
+$(RECOVERY_BUSYBOX_SYMLINKS):
+	@echo "Symlink: $@ -> $(BUSYBOX_BINARY)"
+	@mkdir -p $(dir $@)
+	@rm -rf $@
+	$(hide) ln -sf $(BUSYBOX_BINARY) $@
 
 # All the APIs for testing
 include $(CLEAR_VARS)
